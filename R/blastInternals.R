@@ -73,6 +73,29 @@ blastn <- function(genome='',
 
 }
 
+blastnw <- function(genome='',
+                   db='',
+                   outdir='.',
+                   n_threads=1L,
+                   eval=1e-6){
+
+  #Cambio aqui
+  paste0(normalizePath(outdir, winslash = "/")) -> outdir
+  dbn <- rev(strsplit(db,'/')[[1]])[1]
+  gnam <- rev(strsplit(genome,'/')[[1]])[1]
+  outfile <- paste0(outdir,sub('.f\\w+$','',gnam),'_vs_',sub('[.]\\w+$','',dbn))
+  cmd<-paste0("blastn -word_size 50 -ungapped -dust no -query ",genome,
+              " -db ",db,
+              " -evalue ",eval,
+              " -outfmt  \"6 qseqid sseqid pident gaps length slen evalue qseq sstart send\"",
+              " -out ",outfile,
+              " -num_threads ",n_threads)
+  print(cmd)
+  system(cmd)
+  outfile
+  print(outfile)
+
+}
 
 #' @name readBlastResult
 #' @title Read Blast Result
