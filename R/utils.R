@@ -165,6 +165,47 @@ mlst <- function(genome,
   res
 }
 
+mlstw <- function(genome,
+                 dbs,
+                 write='new',
+                 prefix = 'allele',
+                 dir='.',
+                 dnw = paste0(dir, 'tmp/'),
+                 n_threads=1L,
+                 outf=tempdir(),
+                 pid=90,
+                 scov=0.9){
+
+  paste0(file.path(dir),'/') -> dir
+
+  res <- c()
+  nams <- c()
+  for (i in 1:length(dbs)){
+    # outf <- tempdir()
+    blout <- blastnw(genome = genome,
+                    db = dbs[i],
+                    outdir = outf,
+                    n_threads = n_threads)
+    blastRes <- readBlastResult(blout = blout)
+    a <- processBlastResult(blastRes = blastRes,
+                            write=write,
+                            prefix = prefix,
+                            dir = dir,
+                            dnw = dnw,
+                            pid = pid,
+                            scov = scov)
+    res[i] <- as.character(a)
+    nams[i] <- names(a)
+  }
+  print(res)
+  print(nams)
+
+
+  names(res) <- nams
+  res
+}
+
+
 
 #' @name getf
 #' @title Get a vector of integers which represents a factor to split the
