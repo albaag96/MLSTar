@@ -311,4 +311,270 @@ doMLST <- function(infiles,
   return(out)
 }
 
+library(future.apply)
+
+doMLSTw <- function(infiles,
+                   org='leptospira',
+                   scheme=1L,
+                   schemeFastas=NULL,
+                   schemeProfile=NULL,
+                   write = 'new',
+                   ddir = paste0('pubmlst','_',org,'_',scheme),
+                   fdir = paste0('alleles','_',org,'_',scheme),
+                   n_threads=1L,
+                   pid=90L,
+                   scov=1.0){
+
+  if(Sys.which('blastn')==''){
+    stop('blastn binary is not in $PATH. Please install it before running this function.')
+  }
+
+  if (is.null(schemeFastas) | is.null(schemeProfile)){
+    if(!dir.exists(ddir)){
+      dir.create(ddir, recursive = FALSE)
+      ddir <- paste0(file.path(ddir),'/')
+    }else{
+      stop(paste0(ddir, ' already exists.'))
+    }
+  }
+
+  write <- match.arg(write, c('none', 'new', 'all'))
+
+  if (write%in%c('new', 'all')){
+    if(!dir.exists(fdir)){
+      #dont normalize path because in following steps directories are created
+      # recursively.
+      dir.create(fdir, recursive = FALSE)
+    }else{
+      stop(paste0(fdir, ' already exists.'))
+    }
+  }
+
+  if(pid>100){
+    stop('pid must be a integer smaller than 100.')
+  }
+
+  if(scov>1 | scov<0){
+    stop('scov must be between 0 and 1')
+  }else if(scov < 0.7){
+    warning('scov below 0.7 . Recomended: scov >= 0.7 . Continuing anyway..',
+            immediate. = T)
+  }
+
+  if(any(!file.exists(infiles))){
+    stop('One or more infiles do/es not exists in specified path.')
+  }
+
+
+  #Valid org?
+  if(!org%in%listPubmlst_orgs()){
+    stop(paste0(org,' is not in pubmlst database. Try listPubmlst_orgs() to see avaliables.'))
+  }
+
+
+  #Fasta files: If NULL, download; else, check if ok.
+  if(is.null(schemeFastas)){
+
+    cat(paste0('Downloading ',org,
+               ' scheme ',scheme,
+               ' MLST sequences at ',ddir,'/ .\n'))
+    schemeFastas <- downloadPubmlst_seq(org = org,
+                                        scheme=scheme,
+                                        dir = ddir,
+                                        n_threads = 1L)
+  }else{
+
+    if(any(!file.exists(schemeFastas))){
+      warning('One or more schemeFastas do/es not exists in specified path. Downloading..',
+              immediate. = T)
+      cat(paste0('Downloading ',org,
+                 ' scheme ',scheme,
+                 ' MLST sequences at ',ddir,'/ .\n'))
+      schemeFastas <- downloadPubmlst_seq(org = org,
+                                          scheme=scheme,
+                                          dir = ddir,
+                                          n_threads = 1L)
+    }else{
+      all(grepl('.fas$',schemeFastas)) -> ext
+      if (ext){
+        for(i in 1:length(schemeFastas)){
+          readLines(schemeFastas[i])-> rl
+          rl[grep('>',rl)]->rl
+          all(sapply(strsplit(rl,'_'),length)>=2) -> three
+          if(!three){
+            stop("Sequence headers doesn't have the expected format. Please download them directly
+               from pubmlst.org or use the supplied R functions in this package.")
+          }
+        }
+      }else{
+        stop('Sequences should have the ".fas" extension. Please download them directly from
+           pubmlst.org or use the supplied R functions in this package.')
+      }
+    }
+  }
+
+
+  #Scheme profile file: If NULL, download; else, check if ok.
+  if (is.null(schemeProfile)){
+    cat(paste0('Downloading ',org,
+               ' scheme ',scheme,
+               ' MLST profile at ',ddir,'/ .\n'))
+    schemeProfile <- downloadPubmlst_profile(org = org,
+                                             scheme = scheme,
+                                             dir = ddir)
+    prof <- read.csv(schemeProfile,sep = '\t',header = T, colClasses = 'character')
+
+    #Patch to avoid some strange publst profiles issues
+    if (!'clonal_complex'%in%colnames(prof)){
+      ap <- apply(prof, 2, function(y){all(is.na(y))})
+      if(any(ap)){
+        prof[, which(ap)] <- rownames(prof)
+        names(prof) <- names(prof)[c(2:dim(prof)[2], 1)]
+      }
+    }
+
+  }else{
+    if(!file.exists(schemeProfile)){
+      warning('schemeProfile file missing, downloading..',immediate. = T)
+      cat(paste0('Downloading ',org,
+                 ' scheme ',scheme,
+                 ' MLST profile at ',ddir,'/ .\n'))
+      schemeProfile <- downloadPubmlst_profile(org = org,
+                                               scheme = scheme,
+                                               dir = ddir)
+      prof <- read.csv(schemeProfile,sep = '\t',header = T, colClasses = 'character')
+    }else{
+      prof <- read.csv(schemeProfile,sep = '\t',header = T, colClasses = 'character')
+      fils <- sub('.fas$','',sapply(schemeFastas,function(x){rev(strsplit(x,'/')[[1]])[1]}))
+      if (!all(fils%in%colnames(prof))){
+        stop("The scheme fasta files doesn't correspond to the supplied profile file.
+      (One or more file names are not represented in the profile's column names)")
+      }
+    }
+  }
+
+
+  if (!is.null(schemeFastas)){
+    #check if blast databases exists
+    dds <- lapply(sub('fas$', '', schemeFastas), function(x){
+      paste0(x, c('nsq', 'nin', 'nhr'))
+    })
+    dds<- unlist(dds)
+
+    if (!all(file.exists(dds))){
+      #Make BLAST DATABASEs
+      cat('Making BLAST databases...')
+      #SUBSTITUYO PARALLEL::MCLAPPLY POR LAPPLY
+      dbs <- lapply(schemeFastas, function(x){
+        makeblastdb(infile = x)
+      })
+      unlist(dbs) -> dbs
+      cat(' DONE!\n')
+    }else{
+      dbs <- sub('[.]fas$', '', schemeFastas)
+    }
+  }else{
+    #Make BLAST DATABASEs
+    cat('Making BLAST databases...')
+    #Substituyo parallel::mclapply por lapply
+    dbs <- lapply(schemeFastas, function(x){
+      makeblastdb(infile = x)
+    })
+    unlist(dbs) -> dbs
+    cat(' DONE!\n')
+  }
+
+  #Determine mlst for each genome
+  file.path(infiles) -> infiles
+  print(infiles)
+  cat('Running BLASTN...')
+  plan(multisession, workers = 1)
+  resu <- future_lapply(infiles,function(x){
+    mlstw(genome = x,
+         dbs = dbs,
+         write = write,
+         prefix = fdir,
+         dir = getwd(),
+         #dnw = dnw,
+         outf = tempdir(),
+         pid = pid,
+         scov = scov)
+  })
+
+  cat(' DONE!\n')
+  resu <- do.call(rbind,resu)
+  View(resu)
+
+  rownames(resu) <- sub('[.]\\w+$','',basename(infiles))
+  resu <- as.data.frame(resu, stringsAsFactors = FALSE)
+
+
+
+  resu <- processResu(resu = resu,
+                      write = write,
+                      dbs = dbs,
+                      dir = paste0(getwd(),'/'),
+                      prefix = fdir)
+
+  #There are some cases where a ST doesn't have all the alleles, particularly in cgMLST.
+  if(length(which(prof=='N'))>0){
+    prof[which(prof=='N', arr.ind = TRUE)] <- 'NA'
+  }
+
+
+  #Convert everything to character to allow comparisons:
+  resu[] <- lapply(resu, as.character)
+  print(resu[])
+
+
+  # prof[] <- lapply(prof, as.character)
+  #SE AÑADE DROP = FALSE PARA QUE SE MANTENGA EL DATA FRAME
+  sprof <- prof[, colnames(resu), drop = FALSE]
+  View(sprof)
+  dim(sprof)
+
+  #Detect ST
+  ty <- c('ST', 'cgST')[c('ST', 'cgST')%in%colnames(prof)]
+  if (ty=='ST'){
+    ig <- apply(resu,1,function(x){
+      prof$ST[which(apply(sprof,1,function(y){
+        identical(x, y)
+      }))]
+    })
+  }else{
+    ig <- apply(resu,1,function(x){
+      prof$cgST[which(apply(sprof,1,function(y){
+        identical(x, y)
+      }))]
+    })
+    colnames(prof) <- sub('^cgST$', 'ST', colnames(prof))
+  }
+
+
+
+  ig[!sapply(ig,length)] <- NA
+  if(length(ig)>0){
+    resu$ST <- unlist(ig)
+  }else{
+    resu$ST <- NA
+  }
+
+
+
+  #Return
+  prof <- prof[, colnames(resu)]
+  out <- list(result = resu,
+              profile = prof)
+
+  attr(out, 'infiles') <- basename(infiles)
+  attr(out, 'org') <- org
+  attr(out, 'scheme') <- scheme
+  attr(out, 'write') <- write
+  attr(out, 'pid') <- pid
+  attr(out, 'scov') <- scov
+  attr(out, 'class') <- 'mlst'
+
+  return(out)
+}
+
 
