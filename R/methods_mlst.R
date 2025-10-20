@@ -1,4 +1,5 @@
 #' @export
+#' @export
 print.mlst <- function(x, ...){
 
   infiles <- attr(x, 'infiles')
@@ -18,6 +19,8 @@ print.mlst <- function(x, ...){
 
 # as.data.frame.mlst <- function(mlst){
 #   mlst$result
+# }
+# }
 # }
 
 # summary.mlst <- function(mlst){
