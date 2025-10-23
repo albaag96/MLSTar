@@ -97,7 +97,7 @@ blastnw <- function(genome='',
                    eval=1e-6){
 
   #Cambio aqui
-  paste0(normalizePath(outdir, winslash = "/")) -> outdir
+  paste0(normalizePath(outdir, winslash = "/"),"/") -> outdir
   dbn <- rev(strsplit(db,'/')[[1]])[1]
   gnam <- rev(strsplit(genome,'/')[[1]])[1]
   outfile <- paste0(outdir,sub('.f\\w+$','',gnam),'_vs_',sub('[.]\\w+$','',dbn))
@@ -277,3 +277,4 @@ processBlastResult <- function(blastRes,
 
 
 }
+
