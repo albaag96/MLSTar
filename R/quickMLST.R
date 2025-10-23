@@ -312,7 +312,7 @@ doMLST <- function(infiles,
 }
 
 
-#' @name doMLST
+#' @name doMLSTw
 #' @title Perform MLST Analysis Over a List of Genomes for Windows
 #' @description Takes a list of genome fasta files and perform blastn searches
 #' to identify the sequence type for each of the genes/loci available in a mlst
@@ -365,6 +365,8 @@ doMLST <- function(infiles,
 #' @author Alba Arranz García
 #' @export
 #' @importFrom future.apply future_lapply
+#' @importFrom future plan multisession
+
 doMLSTw <- function(infiles,
                    org='leptospira',
                    scheme=1L,
