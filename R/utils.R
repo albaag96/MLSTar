@@ -165,6 +165,31 @@ mlst <- function(genome,
   res
 }
 
+
+#' @name mlstw
+#' @title MLST
+#' @description Perform Multi Locus Sequence Typing in windows
+#' @param genome A FASTA file with the genome sequence.
+#' @param dbs Subject database files. No subfix needed.
+#' @param write \code{character}. One of \code{"new"} (Default), \code{"all"} or
+#' \code{"none"}. The fist one writes only new alleles found (not reported in
+#' pubmlst.org), the second writes all alleles found, and "none" do not write
+#' any file.
+#' @param prefix \code{character} A prefix to the fasta files of found
+#' sequences (see \code{write}). (Default: \code{"allele"}).
+#' @param dir An existing directory where to put the loci fasta files in case
+#' they are not provided by the user. Also sequences found will be placed here
+#' if \code{write} is set to ethier \code{"new"} or \code{"all"}.
+#' @param dnw Temporary directory where to put new alleles to check later if
+#' are the same.
+#' @param n_threads \code{integer}. The number of threads to use by BLASTN.
+#' @param outf Where the blastn output will be written.
+#' @param pid Percentage identity.
+#' @param scov Query coverage.
+#' @returns A vector with the mlst.
+#' @author Alba Arranz García
+#' @importFrom parallel mclapply
+#' @importFrom utils read.csv
 mlstw <- function(genome,
                  dbs,
                  write='new',

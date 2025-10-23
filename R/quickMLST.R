@@ -311,8 +311,60 @@ doMLST <- function(infiles,
   return(out)
 }
 
-library(future.apply)
 
+#' @name doMLST
+#' @title Perform MLST Analysis Over a List of Genomes for Windows
+#' @description Takes a list of genome fasta files and perform blastn searches
+#' to identify the sequence type for each of the genes/loci available in a mlst
+#' scheme.
+#' @param infiles A vector of genome sequence file paths in fasta format. Could
+#' also be multifasta files of predicted Open Reading Frames.
+#' @param org A valid organism from pubmlst.org. Run \link{listPubmlst_orgs} to
+#' see available ones.
+#' @param scheme \code{integer}. The scheme id number for a given organism. Run
+#' \link{listPubmlst_schemes} to see available schemes for certain \code{org}.
+#' @param schemeFastas  A vector with the path to fasta sequences from each
+#' loci of the specified mlst scheme. If it is \code{NULL} (default), sequences
+#' are downloaded from \url{http://rest.pubmlst.org} to \code{dir}.
+#' @param schemeProfile The path to the profile file (.tab). If left \code{NULL}
+#' then it is downloaded from \url{http://rest.pubmlst.org} to \code{dir}.
+#' @param write \code{character}. One of \code{"new"} (Default), \code{"all"} or
+#' \code{"none"}. The fist one writes only new alleles found (not reported in
+#' pubmlst.org), the second writes all alleles found, and "none" do not write
+#' any file.
+#' @param ddir A non-existing directory where to download the loci fasta files
+#' in case they are not provided by the user. Default:
+#' \code{paste0('pubmlst','_',org,'_',scheme)}
+#' @param fdir A non-existing directory where to write fasta files of found
+#' sequences (see \code{write}). (Default:
+#' \code{paste0('alleles','_',org,'_',scheme)}).
+#' @param n_threads \code{integer}. The number of cores to use. Each job consist
+#' on the process for one genome. Blastn searches will use 1 core per job.
+#' @param pid Percentage identity threshold to be consider as a novel allele. An
+#' \code{integer} <= 100. (Default: 90).
+#' @param scov Subject coverage threshold to be consider as a novel allele. A
+#' \code{numeric} between 0 and 1. Not recomended to set it below 0.7 .
+#' (Default 1.0)
+#'
+#' @returns An object of class "mlst", which consists on a list of 2 dataframes.
+#' The first one is the alleles called for the \code{infiles} and the ST
+#' detected, whereas the second is the scheme profile. The "result" data.frame
+#' shows one genome per row and one gene from the selected scheme per column.
+#' The last column is the ST detected for each genome. "NA" values means that
+#' no allele were found in the respective genome. A 'u' (from 'unknown') plus
+#' an integer means that the allele found was not reported in pubmlst.org
+#' database; a fasta file with the new allele is written in this case if
+#' \code{"write"} is set to "new" or "all" (see above). New alleles are
+#' compared with each other so the names are properly chosen in case 2 or more
+#' of those novel alleles were the same (in that cases, the names would be the
+#' same). A number indicates the allele id number of the reported alleles in
+#' pubmlst.org . The second data.frame is the profile definition chosen, the
+#' logic is the same as the first one but in this case rows are the combination
+#' of alleles reported at pubmlst.org . A series of attributes are also given
+#' in the "mlst" object, mainly refering to the parameters used by the function.
+#' @author Alba Arranz García
+#' @export
+#' @importFrom future.apply future_lapply
 doMLSTw <- function(infiles,
                    org='leptospira',
                    scheme=1L,
@@ -503,7 +555,6 @@ doMLSTw <- function(infiles,
 
   cat(' DONE!\n')
   resu <- do.call(rbind,resu)
-  View(resu)
 
   rownames(resu) <- sub('[.]\\w+$','',basename(infiles))
   resu <- as.data.frame(resu, stringsAsFactors = FALSE)
@@ -530,8 +581,6 @@ doMLSTw <- function(infiles,
   # prof[] <- lapply(prof, as.character)
   #SE AÑADE DROP = FALSE PARA QUE SE MANTENGA EL DATA FRAME
   sprof <- prof[, colnames(resu), drop = FALSE]
-  View(sprof)
-  dim(sprof)
 
   #Detect ST
   ty <- c('ST', 'cgST')[c('ST', 'cgST')%in%colnames(prof)]

@@ -2,9 +2,24 @@
 % Please edit documentation in R/quickMLST.R
 \name{doMLST}
 \alias{doMLST}
+\alias{doMLSTw}
 \title{Perform MLST Analysis Over a List of Genomes}
 \usage{
 doMLST(
+  infiles,
+  org = "leptospira",
+  scheme = 1L,
+  schemeFastas = NULL,
+  schemeProfile = NULL,
+  write = "new",
+  ddir = paste0("pubmlst", "_", org, "_", scheme),
+  fdir = paste0("alleles", "_", org, "_", scheme),
+  n_threads = 1L,
+  pid = 90L,
+  scov = 1
+)
+
+doMLSTw(
   infiles,
   org = "leptospira",
   scheme = 1L,
@@ -56,10 +71,26 @@ on the process for one genome. Blastn searches will use 1 core per job.}
 
 \item{scov}{Subject coverage threshold to be consider as a novel allele. A
 \code{numeric} between 0 and 1. Not recomended to set it below 0.7 .
-(Default 1.0)
-# @details}
+(Default 1.0)}
 }
 \value{
+An object of class "mlst", which consists on a list of 2 dataframes.
+The first one is the alleles called for the \code{infiles} and the ST
+detected, whereas the second is the scheme profile. The "result" data.frame
+shows one genome per row and one gene from the selected scheme per column.
+The last column is the ST detected for each genome. "NA" values means that
+no allele were found in the respective genome. A 'u' (from 'unknown') plus
+an integer means that the allele found was not reported in pubmlst.org
+database; a fasta file with the new allele is written in this case if
+\code{"write"} is set to "new" or "all" (see above). New alleles are
+compared with each other so the names are properly chosen in case 2 or more
+of those novel alleles were the same (in that cases, the names would be the
+same). A number indicates the allele id number of the reported alleles in
+pubmlst.org . The second data.frame is the profile definition chosen, the
+logic is the same as the first one but in this case rows are the combination
+of alleles reported at pubmlst.org . A series of attributes are also given
+in the "mlst" object, mainly refering to the parameters used by the function.
+
 An object of class "mlst", which consists on a list of 2 dataframes.
 The first one is the alleles called for the \code{infiles} and the ST
 detected, whereas the second is the scheme profile. The "result" data.frame
@@ -81,6 +112,10 @@ in the "mlst" object, mainly refering to the parameters used by the function.
 Takes a list of genome fasta files and perform blastn searches
 to identify the sequence type for each of the genes/loci available in a mlst
 scheme.
+
+Takes a list of genome fasta files and perform blastn searches
+to identify the sequence type for each of the genes/loci available in a mlst
+scheme.
 }
 \references{
 Altschul, Gish, Miller, Myers & Lipman. (1990) "Basic local
@@ -93,4 +128,6 @@ doi:10.1093/database/bax060.
 }
 \author{
 Ignacio Ferres
+
+Alba Arranz García
 }
