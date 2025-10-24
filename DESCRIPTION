@@ -16,6 +16,7 @@ Imports:
   grDevices,
   graphics,
   future.apply,
+  future,
   scales
 Depends: 
   R (>= 3.2.3),
